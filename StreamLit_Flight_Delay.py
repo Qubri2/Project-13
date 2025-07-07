@@ -1,20 +1,25 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import gdown
 from xgboost import XGBRegressor
 from sklearn.metrics import mean_squared_error
 from sklearn.model_selection import train_test_split
 
+# === Download CSV from Google Drive ===
+# File ID from your link: https://drive.google.com/file/d/1yPf6wVcKODwhdyZzCpv_aqZJKzmfmp0s/view
+gdown.download(id="1yPf6wVcKODwhdyZzCpv_aqZJKzmfmp0s", output="flight_delay.csv", quiet=False)
+
 # === Load and preprocess data ===
-df = pd.read_csv("https://drive.google.com/uc?export=download&id=1yPf6wVcKODwhdyZzCpv_aqZJKzmfmp0s")
+df = pd.read_csv("flight_delay.csv")
 
-# https://drive.google.com/uc?export=download&id=1yPf6wVcKODwhdyZzCpv_aqZJKzmfmp0s
-
-# Hopefully tell whats wrong 
+# Sanity check (optional, can be removed later)
+print("✅ File loaded successfully.")
 print("Columns:", df.columns.tolist())
 print(df.head())
 
 # === Clean and prepare datetime ===
+df.columns = df.columns.str.strip().str.upper()  # Normalize column names
 df['FL_DATE'] = pd.to_datetime(df['FL_DATE'])
 df['ARR_DELAY'] = df['ARR_DELAY'].fillna(0)  # Fill target NaNs with 0
 
@@ -80,3 +85,4 @@ plt.legend()
 plt.grid(True)
 plt.tight_layout()
 plt.show()
+
