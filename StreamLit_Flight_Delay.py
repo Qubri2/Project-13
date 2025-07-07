@@ -6,7 +6,7 @@ from sklearn.metrics import mean_squared_error
 from sklearn.model_selection import train_test_split
 
 # === Load and preprocess data ===
-df = pd.read_csv("/Users/b.brice/IdeaProjects/CEAMLS PROJECT 13/IntelliJ Downloads/Actual Download/flights_sample_3m.csv")
+df = pd.read_csv("https://drive.google.com/uc?export=download&id=1yPf6wVcKODwhdyZzCpv_aqZJKzmfmp0s")
 
 # === Clean and prepare datetime ===
 df['FL_DATE'] = pd.to_datetime(df['FL_DATE'])
