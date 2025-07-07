@@ -8,6 +8,10 @@ from sklearn.model_selection import train_test_split
 # === Load and preprocess data ===
 df = pd.read_csv("https://drive.google.com/uc?export=download&id=1yPf6wVcKODwhdyZzCpv_aqZJKzmfmp0s")
 
+# Hopefully tell whats wrong 
+print("Columns:", df.columns.tolist())
+print(df.head())
+
 # === Clean and prepare datetime ===
 df['FL_DATE'] = pd.to_datetime(df['FL_DATE'])
 df['ARR_DELAY'] = df['ARR_DELAY'].fillna(0)  # Fill target NaNs with 0
