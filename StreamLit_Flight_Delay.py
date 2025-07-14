@@ -13,17 +13,16 @@ warnings.filterwarnings('ignore')
 # ---------- Data Loading ----------
 @st.cache_data
 def load_and_prepare_data():
+    url = "https://drive.google.com/uc?export=download&id=183IEgHFz55voJzaS2v4ZYgUbUUuJNhcX"
     try:
-        df = pd.read_csv("/Users/b.brice/IdeaProjects/CEAMLS PROJECT 13/IntelliJ Downloads/Actual Download/merged_flights_weather.csv")
+        df = pd.read_csv(url)
         df = df.dropna(subset=['ARRIVAL_DELAY'])
-        df['FLIGHT_DATE'] = pd.to_datetime(df[['YEAR', 'MONTH', 'DAY']], errors='coerce')  # New
+        df['FLIGHT_DATE'] = pd.to_datetime(df[['YEAR', 'MONTH', 'DAY']], errors='coerce')
         return df
-    except FileNotFoundError:
-        st.error("CSV file not found.")
-        return None
     except Exception as e:
         st.error(f"Error loading data: {e}")
         return None
+
 
 # ---------- Preprocessing ----------
 def preprocess_features(df):
