@@ -8,7 +8,7 @@ from sklearn.preprocessing import LabelEncoder
 from xgboost import XGBRegressor
 import plotly.express as px
 import gdown
-
+import requests
 
 warnings.filterwarnings('ignore')
 
@@ -16,17 +16,32 @@ warnings.filterwarnings('ignore')
 
 @st.cache_data
 def load_and_prepare_data():
-    url = "https://drive.google.com/uc?export=download&id=183IEgHFz55voJzaS2v4ZYgUbUUuJNhcX"
-    output = "merged_flights_weather.csv"
+    file_id = "183IEgHFz55voJzaS2v4ZYgUbUUuJNhcX"
+    url = f"https://drive.google.com/uc?export=download&id={file_id}"
+
+    session = requests.Session()
+
+    response = session.get(url, params={'id': file_id}, stream=True)
+    token = None
+
+    for key, value in response.cookies.items():
+        if key.startswith('download_warning'):
+            token = value
+
+    if token:
+        params = {'id': file_id, 'confirm': token}
+        response = session.get(url, params=params, stream=True)
+
+    # Read the content into pandas DataFrame
     try:
-        gdown.download(url, output, quiet=False)
-        df = pd.read_csv(output)
+        df = pd.read_csv(pd.compat.StringIO(response.content.decode('utf-8')))
         df = df.dropna(subset=['ARRIVAL_DELAY'])
         df['FLIGHT_DATE'] = pd.to_datetime(df[['YEAR', 'MONTH', 'DAY']], errors='coerce')
         return df
     except Exception as e:
         st.error(f"Error loading data: {e}")
         return None
+
 
 
 
