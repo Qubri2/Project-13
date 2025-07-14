@@ -9,6 +9,7 @@ from xgboost import XGBRegressor
 import plotly.express as px
 import requests
 from io import StringIO
+import os
 
 warnings.filterwarnings('ignore')
 
@@ -17,29 +18,21 @@ warnings.filterwarnings('ignore')
 @st.cache_data
 def load_and_prepare_data():
     file_id = "183IEgHFz55voJzaS2v4ZYgUbUUuJNhcX"
-    url = f"https://drive.google.com/uc?export=download&id={file_id}"
+    url = f"https://drive.google.com/uc?id={file_id}"
 
-    session = requests.Session()
-    response = session.get(url, params={'id': file_id}, stream=True)
-    token = None
+    output = "merged_flights_weather.csv"
 
-    for key, value in response.cookies.items():
-        if key.startswith('download_warning'):
-            token = value
-
-    if token:
-        params = {'id': file_id, 'confirm': token}
-        response = session.get(url, params=params, stream=True)
+    if not os.path.exists(output):
+        try:
+            gdown.download(url, output, quiet=False)
+        except Exception as e:
+            st.error(f"Error downloading file: {e}")
+            return None
 
     try:
-        s = StringIO(response.content.decode('utf-8'))
-        df = pd.read_csv(s)
-
-        # Strip spaces from column names (just in case)
-        df.columns = df.columns.str.strip()
-
-        # Debug print to Streamlit UI
-        st.write("Columns in CSV:", df.columns.tolist())
+        df = pd.read_csv(output)
+        df.columns = df.columns.str.strip()  # Clean columns
+        st.write("Columns in CSV:", df.columns.tolist())  # Debug
 
         df = df.dropna(subset=['ARRIVAL_DELAY'])
         df['FLIGHT_DATE'] = pd.to_datetime(df[['YEAR', 'MONTH', 'DAY']], errors='coerce')
@@ -47,7 +40,6 @@ def load_and_prepare_data():
     except Exception as e:
         st.error(f"Error loading data: {e}")
         return None
-
 # ---------- Preprocessing ----------
 def preprocess_features(df):
     time_cols = ['SCHEDULED_DEPARTURE', 'SCHEDULED_ARRIVAL']
