@@ -7,8 +7,8 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 from xgboost import XGBRegressor
 import plotly.express as px
-import gdown
 import requests
+from io import StringIO
 
 warnings.filterwarnings('ignore')
 
@@ -20,7 +20,6 @@ def load_and_prepare_data():
     url = f"https://drive.google.com/uc?export=download&id={file_id}"
 
     session = requests.Session()
-
     response = session.get(url, params={'id': file_id}, stream=True)
     token = None
 
@@ -32,18 +31,15 @@ def load_and_prepare_data():
         params = {'id': file_id, 'confirm': token}
         response = session.get(url, params=params, stream=True)
 
-    # Read the content into pandas DataFrame
     try:
-        df = pd.read_csv(pd.compat.StringIO(response.content.decode('utf-8')))
+        s = StringIO(response.content.decode('utf-8'))
+        df = pd.read_csv(s)
         df = df.dropna(subset=['ARRIVAL_DELAY'])
         df['FLIGHT_DATE'] = pd.to_datetime(df[['YEAR', 'MONTH', 'DAY']], errors='coerce')
         return df
     except Exception as e:
         st.error(f"Error loading data: {e}")
         return None
-
-
-
 
 # ---------- Preprocessing ----------
 def preprocess_features(df):
@@ -56,7 +52,7 @@ def preprocess_features(df):
 
     exclude = [
         'DEPARTURE_DELAY', 'ARRIVAL_DELAY', 'ARRIVAL_TIME',
-        'FLIGHT_DATE'  # 👈 Exclude datetime column
+        'FLIGHT_DATE'  # Exclude datetime column
     ]
     features = [col for col in df.columns if col not in exclude]
     X = df[features].fillna(0)
@@ -71,13 +67,13 @@ def preprocess_features(df):
 
     return X, y, encoders, features
 
-
 # ---------- Model Training ----------
 def train_model(X, y):
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
     model = XGBRegressor(objective='reg:squarederror', n_estimators=100, max_depth=6, learning_rate=0.1, random_state=42)
     model.fit(X_train, y_train)
     return model, X_train.columns
+
 
 # ---------- Prediction Prep ----------
 def create_prediction_input(inputs, df, encoders, feature_columns):
