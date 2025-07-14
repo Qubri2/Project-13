@@ -10,7 +10,8 @@ import plotly.express as px
 import requests
 from io import StringIO
 import os
-import gdown  # ✅ Required for Google Drive download
+import gdown
+import traceback  # For detailed error messages
 
 warnings.filterwarnings('ignore')
 
@@ -47,7 +48,6 @@ def preprocess_features(df):
             df[col] = pd.to_numeric(df[col], errors='coerce')
 
     y = df['ARRIVAL_DELAY'].fillna(0)
-
     exclude = ['DEPARTURE_DELAY', 'ARRIVAL_DELAY', 'ARRIVAL_TIME', 'FLIGHT_DATE']
     features = [col for col in df.columns if col not in exclude]
     X = df[features].fillna(0)
@@ -70,10 +70,9 @@ def train_model(X, y):
     model.fit(X_train, y_train)
     return model, X_train.columns
 
-# ---------- Prediction Prep ----------
+# ---------- Prediction Input ----------
 def create_prediction_input(inputs, df, encoders, feature_columns):
     date_obj = inputs['date']
-
     route_data = df[
         (df['ORIGIN_AIRPORT'].str.upper() == inputs['origin']) &
         (df['DESTINATION_AIRPORT'].str.upper() == inputs['dest']) &
@@ -118,7 +117,7 @@ def create_prediction_input(inputs, df, encoders, feature_columns):
     input_df = input_df.reindex(columns=feature_columns, fill_value=0)
     return input_df
 
-# ---------- Weather-Based Delay Reasoning ----------
+# ---------- Weather Insights ----------
 def get_weather_delay_reason(df, origin, dest, date):
     subset = df[
         (df['ORIGIN_AIRPORT'].str.upper() == origin.upper()) &
@@ -199,25 +198,28 @@ def get_airport_weather_summary(df, airport_code, month, prefix):
 # ---------- Streamlit Interface ----------
 def main():
     st.set_page_config(page_title="Flight Delay Predictor", layout="centered")
-    st.title("🛫 Flight Delay Prediction System")
-    st.markdown("Enter flight information below to predict arrival delays.")
 
-    with st.spinner("Loading data and model..."):
-        df = load_and_prepare_data()
-        if df is None:
-            return
-        X, y, encoders, features = preprocess_features(df)
-        model, feature_columns = train_model(X, y)
+    try:
+        st.title("🛫 Flight Delay Prediction System")
+        st.markdown("Enter flight information below to predict arrival delays.")
 
-    st.subheader("✍️ Enter Flight Details")
-    with st.form("prediction_form"):
-        origin = st.text_input("Origin Airport Code (e.g., JFK)").upper()
-        dest = st.text_input("Destination Airport Code (e.g., LAX)").upper()
-        airline = st.text_input("Airline Code (e.g., AA)").upper()
-        date = st.date_input("Flight Date", datetime.date.today())
-        scheduled_departure = st.number_input("Scheduled Departure (HHMM)", value=1400, step=100)
-        scheduled_arrival = st.number_input("Scheduled Arrival (HHMM)", value=1600, step=100)
-        submitted = st.form_submit_button("Predict Delay")
+        with st.spinner("Loading data and model..."):
+            df = load_and_prepare_data()
+            if df is None:
+                return
+            X, y, encoders, features = preprocess_features(df)
+            model, feature_columns = train_model(X, y)
+
+        st.subheader("✍️ Enter Flight Details")
+        with st.form("prediction_form"):
+            origin = st.text_input("Origin Airport Code (e.g., JFK)").upper()
+            dest = st.text_input("Destination Airport Code (e.g., LAX)").upper()
+            airline = st.text_input("Airline Code (e.g., AA)").upper()
+            date = st.date_input("Flight Date", datetime.date.today())
+            scheduled_departure = st.number_input("Scheduled Departure (HHMM)", value=1400, step=100)
+            scheduled_arrival = st.number_input("Scheduled Arrival (HHMM)", value=1600, step=100)
+            submitted = st.form_submit
+_button("Predict Delay")
 
     if submitted:
         if not origin or not dest or not airline:
@@ -256,7 +258,6 @@ def main():
         st.text_area("Weather Delay Reason", weather_reason, height=100)
 
         st.subheader("📊 Delay Analytics Dashboard")
-
         st.markdown("#### ✈️ Top 10 Airports with Highest Average Arrival Delays")
         delay_by_airport = df.groupby("ORIGIN_AIRPORT")["ARRIVAL_DELAY"].mean().sort_values(ascending=False).head(10)
         st.bar_chart(delay_by_airport)
@@ -292,5 +293,9 @@ def main():
         else:
             st.info("No delay cause data available.")
 
-if __name__ == "__main__":
-    main()
+except Exception:
+    st.error("🚨 An unexpected error occurred.")
+    st.code(traceback.format_exc())
+if name == "main":
+main()
+
