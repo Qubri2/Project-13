@@ -7,21 +7,27 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 from xgboost import XGBRegressor
 import plotly.express as px
+import gdown
+
 
 warnings.filterwarnings('ignore')
 
 # ---------- Data Loading ----------
+
 @st.cache_data
 def load_and_prepare_data():
     url = "https://drive.google.com/uc?export=download&id=183IEgHFz55voJzaS2v4ZYgUbUUuJNhcX"
+    output = "merged_flights_weather.csv"
     try:
-        df = pd.read_csv(url)
+        gdown.download(url, output, quiet=False)
+        df = pd.read_csv(output)
         df = df.dropna(subset=['ARRIVAL_DELAY'])
         df['FLIGHT_DATE'] = pd.to_datetime(df[['YEAR', 'MONTH', 'DAY']], errors='coerce')
         return df
     except Exception as e:
         st.error(f"Error loading data: {e}")
         return None
+
 
 
 # ---------- Preprocessing ----------
