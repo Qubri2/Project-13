@@ -34,6 +34,13 @@ def load_and_prepare_data():
     try:
         s = StringIO(response.content.decode('utf-8'))
         df = pd.read_csv(s)
+
+        # Strip spaces from column names (just in case)
+        df.columns = df.columns.str.strip()
+
+        # Debug print to Streamlit UI
+        st.write("Columns in CSV:", df.columns.tolist())
+
         df = df.dropna(subset=['ARRIVAL_DELAY'])
         df['FLIGHT_DATE'] = pd.to_datetime(df[['YEAR', 'MONTH', 'DAY']], errors='coerce')
         return df
