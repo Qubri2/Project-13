@@ -10,19 +10,19 @@ import plotly.express as px
 import requests
 from io import StringIO
 import os
+import gdown  # ✅ Required for Google Drive download
 
 warnings.filterwarnings('ignore')
 
 # ---------- Data Loading ----------
-
 @st.cache_data
 def load_and_prepare_data():
     file_id = "183IEgHFz55voJzaS2v4ZYgUbUUuJNhcX"
     url = f"https://drive.google.com/uc?id={file_id}"
-
     output = "merged_flights_weather.csv"
 
     if not os.path.exists(output):
+        st.info("Downloading dataset from Google Drive...")
         try:
             gdown.download(url, output, quiet=False)
         except Exception as e:
@@ -31,15 +31,14 @@ def load_and_prepare_data():
 
     try:
         df = pd.read_csv(output)
-        df.columns = df.columns.str.strip()  # Clean columns
-        st.write("Columns in CSV:", df.columns.tolist())  # Debug
-
+        df.columns = df.columns.str.strip()
         df = df.dropna(subset=['ARRIVAL_DELAY'])
         df['FLIGHT_DATE'] = pd.to_datetime(df[['YEAR', 'MONTH', 'DAY']], errors='coerce')
         return df
     except Exception as e:
         st.error(f"Error loading data: {e}")
         return None
+
 # ---------- Preprocessing ----------
 def preprocess_features(df):
     time_cols = ['SCHEDULED_DEPARTURE', 'SCHEDULED_ARRIVAL']
@@ -49,10 +48,7 @@ def preprocess_features(df):
 
     y = df['ARRIVAL_DELAY'].fillna(0)
 
-    exclude = [
-        'DEPARTURE_DELAY', 'ARRIVAL_DELAY', 'ARRIVAL_TIME',
-        'FLIGHT_DATE'  # Exclude datetime column
-    ]
+    exclude = ['DEPARTURE_DELAY', 'ARRIVAL_DELAY', 'ARRIVAL_TIME', 'FLIGHT_DATE']
     features = [col for col in df.columns if col not in exclude]
     X = df[features].fillna(0)
 
@@ -67,12 +63,12 @@ def preprocess_features(df):
     return X, y, encoders, features
 
 # ---------- Model Training ----------
+@st.cache_resource
 def train_model(X, y):
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
     model = XGBRegressor(objective='reg:squarederror', n_estimators=100, max_depth=6, learning_rate=0.1, random_state=42)
     model.fit(X_train, y_train)
     return model, X_train.columns
-
 
 # ---------- Prediction Prep ----------
 def create_prediction_input(inputs, df, encoders, feature_columns):
@@ -83,13 +79,13 @@ def create_prediction_input(inputs, df, encoders, feature_columns):
         (df['DESTINATION_AIRPORT'].str.upper() == inputs['dest']) &
         (df['AIRLINE'].str.upper() == inputs['airline']) &
         (df['MONTH'] == date_obj.month)
-        ]
+    ]
 
     if route_data.empty:
         route_data = df[
             (df['AIRLINE'].str.upper() == inputs['airline']) &
             (df['MONTH'] == date_obj.month)
-            ]
+        ]
 
     input_dict = {
         'YEAR': date_obj.year,
@@ -128,14 +124,13 @@ def get_weather_delay_reason(df, origin, dest, date):
         (df['ORIGIN_AIRPORT'].str.upper() == origin.upper()) &
         (df['DESTINATION_AIRPORT'].str.upper() == dest.upper()) &
         (df['MONTH'] == date.month)
-        ]
+    ]
 
     if subset.empty:
         return "No weather data available for this route and month."
 
-    origin_weather = subset['origin_weather_desc'].dropna().astype(str) if 'origin_weather_desc' in subset else pd.Series(dtype=str)
-    dest_weather = subset['dest_weather_desc'].dropna().astype(str) if 'dest_weather_desc' in subset else pd.Series(dtype=str)
-
+    origin_weather = subset['origin_weather_desc'].dropna().astype(str)
+    dest_weather = subset['dest_weather_desc'].dropna().astype(str)
     weather_data = pd.concat([origin_weather, dest_weather], ignore_index=True)
 
     if weather_data.empty:
@@ -176,15 +171,10 @@ def get_weather_delay_reason(df, origin, dest, date):
 
 # ---------- Airport Weather Summary ----------
 def get_airport_weather_summary(df, airport_code, month, prefix):
-    airport_cols_map = {
-        "origin": "ORIGIN_AIRPORT",
-        "dest": "DESTINATION_AIRPORT"
-    }
-    ap_col = airport_cols_map.get(prefix, f"{prefix.upper()}_AIRPORT")
-
-    weather_desc_col = f'{prefix}_weather_desc'
-    temp_col = f'{prefix}_temperature'
-    wind_col = f'{prefix}_wind_speed'
+    ap_col = f"{prefix.upper()}_AIRPORT"
+    desc_col = f"{prefix}_weather_desc"
+    temp_col = f"{prefix}_temperature"
+    wind_col = f"{prefix}_wind_speed"
 
     try:
         subset = df[(df[ap_col].str.upper() == airport_code.upper()) & (df['MONTH'] == month)]
@@ -194,7 +184,7 @@ def get_airport_weather_summary(df, airport_code, month, prefix):
     if subset.empty:
         return "⚠️ Weather data unavailable."
 
-    descs = subset[weather_desc_col].dropna().unique()
+    descs = subset[desc_col].dropna().unique()
     desc_text = ", ".join(descs[:3]) + ("..." if len(descs) > 3 else "")
 
     temp_c = subset[temp_col].dropna().mean()
@@ -265,7 +255,6 @@ def main():
         weather_reason = get_weather_delay_reason(df, origin, dest, date)
         st.text_area("Weather Delay Reason", weather_reason, height=100)
 
-        # ---------- 📊 Delay Analytics Dashboard ----------
         st.subheader("📊 Delay Analytics Dashboard")
 
         st.markdown("#### ✈️ Top 10 Airports with Highest Average Arrival Delays")
@@ -286,11 +275,7 @@ def main():
             "Weather": "WEATHER_DELAY"
         }
 
-        cause_sums = {}
-        for label, col in delay_cause_cols.items():
-            if col in df.columns:
-                cause_sums[label] = df[col].sum()
-
+        cause_sums = {label: df[col].sum() for label, col in delay_cause_cols.items() if col in df.columns}
         pie_df = pd.DataFrame.from_dict(cause_sums, orient='index', columns=["Total Delay (min)"])
         pie_df = pie_df[pie_df["Total Delay (min)"] > 0]
 
