@@ -196,6 +196,7 @@ def get_airport_weather_summary(df, airport_code, month, prefix):
     return f"Conditions: {desc_text}\nAvg Temp: {temp_str}\nAvg Wind: {wind_str}"
 
 # ---------- Streamlit Interface ----------
+
 def main():
     st.set_page_config(page_title="Flight Delay Predictor", layout="centered")
 
@@ -218,84 +219,83 @@ def main():
             date = st.date_input("Flight Date", datetime.date.today())
             scheduled_departure = st.number_input("Scheduled Departure (HHMM)", value=1400, step=100)
             scheduled_arrival = st.number_input("Scheduled Arrival (HHMM)", value=1600, step=100)
-            submitted = st.form_submit
-_button("Predict Delay")
+            submitted = st.form_submit_button("Predict Delay")
 
-    if submitted:
-        if not origin or not dest or not airline:
-            st.error("Please provide origin, destination, and airline codes.")
-            return
+        if submitted:
+            if not origin or not dest or not airline:
+                st.error("Please provide origin, destination, and airline codes.")
+                return
 
-        user_inputs = {
-            "origin": origin,
-            "dest": dest,
-            "airline": airline,
-            "date": date,
-            "scheduled_departure": scheduled_departure,
-            "scheduled_arrival": scheduled_arrival
-        }
+            user_inputs = {
+                "origin": origin,
+                "dest": dest,
+                "airline": airline,
+                "date": date,
+                "scheduled_departure": scheduled_departure,
+                "scheduled_arrival": scheduled_arrival
+            }
 
-        with st.spinner("Predicting delay..."):
-            input_df = create_prediction_input(user_inputs, df, encoders, feature_columns)
-            prediction = model.predict(input_df)[0]
+            with st.spinner("Predicting delay..."):
+                input_df = create_prediction_input(user_inputs, df, encoders, feature_columns)
+                prediction = model.predict(input_df)[0]
 
-        st.subheader(f"🕑 Prediction Result for {airline}")
-        if prediction > 0:
-            st.warning(f"🔺 Predicted delay: {prediction:.1f} minutes")
-            if prediction > 15:
-                st.error("⚠️ Significant delay expected. Consider alternate plans.")
-        else:
-            st.success(f"✅ Predicted early/ontime arrival: {abs(prediction):.1f} minutes early")
+            st.subheader(f"🕑 Prediction Result for {airline}")
+            if prediction > 0:
+                st.warning(f"🔺 Predicted delay: {prediction:.1f} minutes")
+                if prediction > 15:
+                    st.error("⚠️ Significant delay expected. Consider alternate plans.")
+            else:
+                st.success(f"✅ Predicted early/ontime arrival: {abs(prediction):.1f} minutes early")
 
-        st.subheader("📍 Airport Weather Conditions")
-        origin_weather_text = get_airport_weather_summary(df, origin, date.month, "origin")
-        dest_weather_text = get_airport_weather_summary(df, dest, date.month, "dest")
-        st.text_area("Origin", origin_weather_text, height=100)
-        st.text_area("Destination", dest_weather_text, height=100)
+            st.subheader("📍 Airport Weather Conditions")
+            origin_weather_text = get_airport_weather_summary(df, origin, date.month, "origin")
+            dest_weather_text = get_airport_weather_summary(df, dest, date.month, "dest")
+            st.text_area("Origin", origin_weather_text, height=100)
+            st.text_area("Destination", dest_weather_text, height=100)
 
-        st.subheader("🌦️ Weather Impact Summary")
-        weather_reason = get_weather_delay_reason(df, origin, dest, date)
-        st.text_area("Weather Delay Reason", weather_reason, height=100)
+            st.subheader("🌦️ Weather Impact Summary")
+            weather_reason = get_weather_delay_reason(df, origin, dest, date)
+            st.text_area("Weather Delay Reason", weather_reason, height=100)
 
-        st.subheader("📊 Delay Analytics Dashboard")
-        st.markdown("#### ✈️ Top 10 Airports with Highest Average Arrival Delays")
-        delay_by_airport = df.groupby("ORIGIN_AIRPORT")["ARRIVAL_DELAY"].mean().sort_values(ascending=False).head(10)
-        st.bar_chart(delay_by_airport)
+            st.subheader("📊 Delay Analytics Dashboard")
+            st.markdown("#### ✈️ Top 10 Airports with Highest Average Arrival Delays")
+            delay_by_airport = df.groupby("ORIGIN_AIRPORT")["ARRIVAL_DELAY"].mean().sort_values(ascending=False).head(10)
+            st.bar_chart(delay_by_airport)
 
-        st.markdown("#### 📈 Monthly Delay Trends")
-        monthly_delay = df.dropna(subset=["FLIGHT_DATE"]).groupby(df["FLIGHT_DATE"].dt.to_period("M"))["ARRIVAL_DELAY"].mean()
-        monthly_delay.index = monthly_delay.index.to_timestamp()
-        st.line_chart(monthly_delay)
+            st.markdown("#### 📈 Monthly Delay Trends")
+            monthly_delay = df.dropna(subset=["FLIGHT_DATE"]).groupby(df["FLIGHT_DATE"].dt.to_period("M"))["ARRIVAL_DELAY"].mean()
+            monthly_delay.index = monthly_delay.index.to_timestamp()
+            st.line_chart(monthly_delay)
 
-        st.markdown("#### 🌧️ Delay Causes – Focus on Weather")
-        delay_cause_cols = {
-            "Air System": "AIR_SYSTEM_DELAY",
-            "Security": "SECURITY_DELAY",
-            "Airline": "AIRLINE_DELAY",
-            "Late Aircraft": "LATE_AIRCRAFT_DELAY",
-            "Weather": "WEATHER_DELAY"
-        }
+            st.markdown("#### 🌧️ Delay Causes – Focus on Weather")
+            delay_cause_cols = {
+                "Air System": "AIR_SYSTEM_DELAY",
+                "Security": "SECURITY_DELAY",
+                "Airline": "AIRLINE_DELAY",
+                "Late Aircraft": "LATE_AIRCRAFT_DELAY",
+                "Weather": "WEATHER_DELAY"
+            }
 
-        cause_sums = {label: df[col].sum() for label, col in delay_cause_cols.items() if col in df.columns}
-        pie_df = pd.DataFrame.from_dict(cause_sums, orient='index', columns=["Total Delay (min)"])
-        pie_df = pie_df[pie_df["Total Delay (min)"] > 0]
+            cause_sums = {label: df[col].sum() for label, col in delay_cause_cols.items() if col in df.columns}
+            pie_df = pd.DataFrame.from_dict(cause_sums, orient='index', columns=["Total Delay (min)"])
+            pie_df = pie_df[pie_df["Total Delay (min)"] > 0]
 
-        if not pie_df.empty:
-            st.plotly_chart(
-                px.pie(
-                    pie_df,
-                    names=pie_df.index,
-                    values="Total Delay (min)",
-                    title="Proportion of Delay Causes (Minutes)",
-                ),
-                use_container_width=True
-            )
-        else:
-            st.info("No delay cause data available.")
+            if not pie_df.empty:
+                st.plotly_chart(
+                    px.pie(
+                        pie_df,
+                        names=pie_df.index,
+                        values="Total Delay (min)",
+                        title="Proportion of Delay Causes (Minutes)",
+                    ),
+                    use_container_width=True
+                )
+            else:
+                st.info("No delay cause data available.")
 
-except Exception:
-    st.error("🚨 An unexpected error occurred.")
-    st.code(traceback.format_exc())
-if name == "main":
-main()
+    except Exception:
+        st.error("🚨 An unexpected error occurred.")
+        st.code(traceback.format_exc())
 
+if __name__ == "__main__":
+    main()
